@@ -399,4 +399,18 @@ sudo ./scripts/slac-sim-veth.sh stop
 
 ---
 
+## Reference (사양)
+
+이 시뮬레이션 및 SLAC/HomePlug Green PHY 동작의 구체적인 사양 레퍼런스는 아래와 같습니다 (open-plc-utils `pev.1` / `evse.1` REFERENCES 기준).
+
+| 구분 | 문서명 |
+|------|--------|
+| **프로토콜 사양** | **HomePlug Green PHY Specification, Release Version 1.1** — SLAC(Signal Level Attenuation Characterization), GreenPPEA(Green PHY PEV-EVSE Association) 메시지·시퀀스 정의. HomePlug Alliance. |
+| **구현/칩셋** | **Qualcomm Atheros AR7420, QCA6410 IEEE 1901, HomePlug AV and QCA7000 HomePlug Green PHY PLC Chipset Programmer's Guide** — QCA7000 등 칩셋 MME, Host-PLC 인터페이스, CM_* 메시지 형식 등. Qualcomm (Atheros). |
+
+- MME 타입·필드 상세: 위 **HomePlug Green PHY Specification** 및 **QCA7000 Programmer's Guide** 참조.
+- 코드 내 구조체 정의: `slac/slac.h`, `mme/homeplug.h`, `mme/mme.h`.
+
+---
+
 **요약:** `slac-sim-veth.sh start` → `run` 또는 `run-capture`(또는 pev/evse 수동 실행)로 시뮬레이션하고, `slac-sim-watch.sh` 또는 tcpdump로 **ether proto 0x88e1** 트래픽을 보면 EV와 EVSE가 주고받는 메시지를 **MAC Layer(PLC 레벨)** 에서 관측할 수 있습니다.
