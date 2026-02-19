@@ -372,7 +372,94 @@ ODA (6)          | OSA (6)          | MTYPE | MMV MMTYPE FMSN FMID | KEYTYPE MYN
 
 **요약:** 공통 헤더 19바이트(0~18)는 항상 동일하고, **오프셋 19부터가 메시지별 payload**이며 위 표대로 바이트/필드가 대응됩니다. 구조체 정의는 `slac/slac.h` 참고.
 
-### 5.4 어떻게 보나
+---
+
+## 5.4 SLAC 메시지별 시간 사양 (타임아웃 / 재전송 / 리셋)
+
+아래 값은 **ISO 15118-3:2015** 본문(Clause 8) 및 **Annex A (HomePlug Green PHY)** Table A.1·관련 요구사항을 기준으로 정리한 것입니다. 구현 시 해당 표준문서를 최종 참조하세요.
+
+### 5.4.1 공통(본문) 타이밍·상수 (Clause 8, Table 3)
+
+| 파라미터 | 설명 | Min | Typical | Max | 단위 |
+|----------|------|-----|---------|-----|------|
+| **C_conn_max_match** | 매칭 프로세스 재시도 횟수 | 3 | — | — | nbr |
+| **C_sequ_retry** | Control Pilot E 전이에 의한 매칭 재시도 횟수 | 2 | 2 | 2 | nbr |
+| **T_conn_init_HLC** | 상태 F/D/C 이후 B 상태 최소 유지 시간 | 200 | — | — | ms |
+| **T_conn_resume** | 웨이크업 트리거 후 통신 준비까지 시간 | — | — | 6 | s |
+| **T_conn_max_comm** | 플러그인 후 통신 준비까지 시간 | — | — | 8 | s |
+| **T_conn_resetup** | 통신 손실 후 매칭 재설정 대기 시간 | — | — | 15 | s |
+| **TP_match_leave** | 논리 네트워크 이탈 최대 시간 | — | — | 1 | s |
+| **T_step_EF** | E/F 상태 유지 시간 | — | — | 4 | s |
+| **TT_EVSE_vald_toggle** | EVSE가 BCB-Toggle 감시 중단하는 타임아웃 (CM_VALIDATE.REQ의 Timer) | — | — | 3 500 | ms |
+
+- 성공한 매칭 프로세스는 모든 타임아웃 타이머와 재시도 카운터를 리셋한다 ([V2G3-M08-02]).
+
+### 5.4.2 Annex A (HomePlug Green PHY) SLAC 전용 타이밍·상수 (Table A.1)
+
+| 파라미터 | 설명 | Min | Typical | Max | 단위 |
+|----------|------|-----|---------|-----|------|
+| **C_EV_match_MNBC** | SLAC용 M-Sound 개수 | 10 | — | — | nbr |
+| **C_EV_match_retry** | 매칭 내 해당 메시지 재전송 횟수 | 2 | — | — | nbr |
+| **C_EV_start_atten_char_inds** | EV가 보내는 CM_START_ATTEN_CHAR.IND 개수 | 3 | — | — | nbr |
+| **TP_EV_batch_msg_interval** | CM_START_ATTEN_CHAR.IND 또는 CM_MNBC_SOUND.IND 간격 | 20 | — | 50 | ms |
+| **TP_EV_match_session** | CM_ATTEN_CHAR.RSP 송신 후 검증 또는 SLAC_MATCH 시작까지(성능) | — | — | 500 | ms |
+| **TP_EV_SLAC_init** | 플러그인(상태 B) 또는 웨이크업 후 EV가 매칭을 시작하기까지 | — | — | 10 | s |
+| **TP_EVSE_avg_atten_calc** | EVSE가 M-SOUND 수신 후 평균 감쇠 계산(성능) | — | — | 100 | ms |
+| **TP_match_response** | 요청에 대한 응답(성능) | — | — | 100 | ms |
+| **TP_match_sequence** | 이전 요청에 대한 응답 수신 후 다음 요청까지(성능) | — | — | 100 | ms |
+| **TT_EV_atten_results** | EV가 CM_ATTEN_CHAR.IND를 기다리는 시간 (첫 CM_START_ATTEN_CHAR.IND 송신 시 시작) | — | 1 200 | — | ms |
+| **TT_EVSE_match_MNBC** | EVSE 측 M-SOUND 수신 타임아웃(평균 감쇠 계산 트리거) | 600 | 600 | — | ms |
+| **TT_EVSE_match_session** | TT_EVSE_match_MNBC 만료 후 CM_VALIDATE.REQ 또는 CM_SLAC_MATCH.REQ 수신까지 최대 시간 | — | — | 10 | s |
+| **TT_EVSE_SLAC_init** | 상태 B 검출 후 EVSE가 CM_SLAC_PARAM.REQ를 수신하기까지 | 20 | — | 50 | s |
+| **TT_match_join** | CM_SLAC_MATCH.CNF 후 링크 수립까지 최대 시간 (초과 시 EV 재시도, EVSE 상태기 리셋) | — | — | 12 | s |
+| **TT_match_response** | EV/EVSE가 응답을 기다리는 시간 | — | 200 | — | ms |
+| **TT_match_sequence** | EVSE/EV가 상대의 요청을 기다리는 시간 | — | 400 | — | ms |
+| **TT_matching_repetition** | 오류 시 매칭 반복 구간 | — | — | 10 | s |
+| **TT_matching_rate** | 매칭 실패 후 전체 매칭 재시도 전 대기 시간 | — | 400 | — | ms |
+
+- CM_SLAC_PARAM.CNF의 **Time_Out** 필드는 0x06으로, EVSE가 CM_START_ATTEN_CHAR.IND 이후 M-SOUND를 수신하는 시간창 **TT_EVSE_match_MNBC**(600 ms)를 의미한다 (Table A.2).
+
+### 5.4.3 메시지/단계별 요약
+
+| 단계 / 메시지 | 타임아웃·재전송·리셋 요약 |
+|----------------|---------------------------|
+| **CM_SLAC_PARAM** | EV: REQ 송신 후 **TT_match_response**(200 ms) 내에 CNF 대기; 없으면 재전송, **C_EV_match_retry**(2회)까지. EVSE: **TT_EVSE_SLAC_init**(20~50 s) 내에 REQ 미수신 시 SLAC 없음으로 간주; REQ 수신 시 **TP_match_response**(100 ms) 내에 CNF 응답. |
+| **CM_START_ATTEN_CHAR** | EV: CNF 수신 후 **TP_match_sequence**(100 ms) 만료 시 IND 3회 송신; 연속 IND 간격 **TP_EV_batch_msg_interval**(20~50 ms). EVSE: CNF 송신 후 **TT_match_sequence**(400 ms) 내에 IND 미수신 시 매칭 실패. |
+| **CM_MNBC_SOUND** | EV: IND 간격 **TP_EV_batch_msg_interval**. EVSE: 첫 CM_START_ATTEN_CHAR.IND 수신 시 **TT_EVSE_match_MNBC**(600 ms) 시작; 만료 또는 M-SOUND 모두 수신 후 **TP_EVSE_avg_atten_calc**(100 ms) 내에 CM_ATTEN_CHAR.IND 송신. |
+| **CM_ATTEN_CHAR** | EV: 첫 CM_START_ATTEN_CHAR.IND 송신 시 **TT_EV_atten_results**(1 200 ms) 시작; 이 시간 내에 IND 수신·처리. IND 수신 시 **TP_match_sequence**(100 ms) 내에 RSP 응답. EVSE: IND 송신 후 **TT_match_response**(200 ms) 내에 RSP 미수신 시 IND 재전송, **C_EV_match_retry**(2회)까지. |
+| **CM_SLAC_MATCH** | EV: CM_ATTEN_CHAR.RSP 송신 후 **TP_EV_match_session**(500 ms) 내에 REQ 송신(성능). REQ에 대한 CNF는 **TT_match_response** 수준으로 기대. **TT_match_join**(12 s) 내에 링크 미수립 시 EV는 매칭 재시도, EVSE는 상태기 리셋. |
+| **리셋/재시도** | 성공한 매칭 시 모든 타임아웃·재시도 카운터 리셋. 매칭 실패 후 **TT_matching_rate**(400 ms) 대기 후 전체 매칭 재시도 가능. AC EVSE 5% 듀티 시: **TT_EVSE_SLAC_init** 내 SLAC 요청 없으면 E/F → T_step_EF → 5% 복귀, **C_sequ_retry**(2회) 후 X1. |
+
+---
+
+## 5.5 메시지 연속성 및 단계별 시간 제약
+
+### 5.5.1 메시지가 “연속적”이어야 하는가?
+
+- **요청–응답 쌍 단위**: SLAC는 **요청을 보내고 정해진 시간 내에 응답을 기다리는** 구조이다. 따라서 “다음 메시지”가 곧바로 이어질 필요는 없고, **각 단계에서 정해진 타임아웃(TT_* / TP_*) 내에** 응답 또는 다음 동작이 이루어지면 된다.
+- **단계 간 간격**:
+  - **TP_match_sequence**(100 ms): 이전 응답 수신 후 다음 요청을 보내기까지의 **성능** 목표(연속성 강제 아님).
+  - **TP_EV_batch_msg_interval**(20~50 ms): CM_START_ATTEN_CHAR.IND·CM_MNBC_SOUND.IND **연속 송신 간격** — 이 구간은 실제로 연속 송신이 요구된다.
+- **전체 SLAC 단계의 총 시간 제한**: 단일 “SLAC 전체를 N초 안에 끝내라”는 전역 타임아웃은 표준에 명시되어 있지 않다. 대신 다음이 만족되면 된다.
+  - EV: 플러그인/웨이크업 후 **TP_EV_SLAC_init**(10 s) 내에 매칭 시작(CM_SLAC_PARAM.REQ).
+  - EVSE: 상태 B 검출 후 **TT_EVSE_SLAC_init**(20~50 s) 내에 CM_SLAC_PARAM.REQ 수신.
+  - EVSE: TT_EVSE_match_MNBC 만료 후 **TT_EVSE_match_session**(10 s) 내에 CM_VALIDATE.REQ 또는 CM_SLAC_MATCH.REQ 수신.
+  - CM_SLAC_MATCH.CNF 후 **TT_match_join**(12 s) 내에 링크 수립.
+
+### 5.5.2 정리
+
+| 질문 | 답변 |
+|------|------|
+| 응답은 정해진 시간 내에 와야 하는가? | 예. 각 요청에 대해 **TT_match_response**(200 ms) 또는 단계별 타임아웃(TT_EV_atten_results, TT_EVSE_match_MNBC 등) 내에 응답이 있어야 한다. |
+| 다음 메시지 전송까지 특정 시간을 지켜야 하는가? | **CM_START_ATTEN_CHAR.IND / CM_MNBC_SOUND.IND** 연속 송신 시 **TP_EV_batch_msg_interval**(20~50 ms) 유지. 그 외에는 “다음 요청”까지 **TP_match_sequence**(100 ms) 성능 권장만 있고, 절대적 연속성 제한은 없다. |
+| SLAC 전체가 특정 시간 내에 끝나야 하는가? | 전체를 하나의 타임아웃으로 묶는 규정은 없고, **시작 시점(TP_EV_SLAC_init, TT_EVSE_SLAC_init)** 과 **단계별 타임아웃(TT_EVSE_match_session, TT_match_join 등)** 을 만족하면 된다. |
+| 재전송은? | CM_SLAC_PARAM: EV가 CNF 없으면 **C_EV_match_retry**(2회) 재전송. CM_ATTEN_CHAR: EVSE가 RSP 없으면 **C_EV_match_retry**(2회) IND 재전송. |
+
+위 사양의 원문·요구사항 번호는 **ISO 15118-3:2015** Clause 8, Clause 9, Annex A (특히 A.8, A.9.1.3, A.9.2.3)를 참조한다.
+
+---
+
+### 5.6 어떻게 보나
 
 - **실시간 hex:**  
   `sudo tcpdump -i veth_pev -XX ether proto 0x88e1`  
@@ -405,10 +492,13 @@ sudo ./scripts/slac-sim-veth.sh stop
 
 | 구분 | 문서명 |
 |------|--------|
+| **물리/데이터링크 계층 (타이밍·매칭)** | **ISO 15118-3:2015**, *Road vehicles — Vehicle to grid communication interface — Part 3: Physical and data link layer requirements*. Clause 8 (Timings and constants), Clause 9 (Matching EV–EVSE process), **Annex A (normative) HomePlug Green PHY on control pilot line** — SLAC 파라미터 교환·감쇠 측정·매칭 시퀀스, **타임아웃/재전송/리셋** 상수(Table 3, Table A.1) 및 요구사항 [V2G3-M08-*], [V2G3-A09-*] 등. |
+| **프로젝트 내 사양 PDF** | **`slac/ISO15118-3.pdf`** — 위 ISO 15118-3 표준 문서(동일 내용). 본 문서의 “5.4 SLAC 메시지별 시간 사양”, “5.5 메시지 연속성 및 단계별 시간 제약”은 이 파일을 참조하여 정리함. |
 | **프로토콜 사양** | **HomePlug Green PHY Specification, Release Version 1.1** — SLAC(Signal Level Attenuation Characterization), GreenPPEA(Green PHY PEV-EVSE Association) 메시지·시퀀스 정의. HomePlug Alliance. |
 | **구현/칩셋** | **Qualcomm Atheros AR7420, QCA6410 IEEE 1901, HomePlug AV and QCA7000 HomePlug Green PHY PLC Chipset Programmer's Guide** — QCA7000 등 칩셋 MME, Host-PLC 인터페이스, CM_* 메시지 형식 등. Qualcomm (Atheros). |
 
-- MME 타입·필드 상세: 위 **HomePlug Green PHY Specification** 및 **QCA7000 Programmer's Guide** 참조.
+- **타이밍·재전송·리셋**: **ISO 15118-3** Clause 8 (Table 3), Annex A (Table A.1, A.9.1.3, A.9.2.3) 및 `slac/ISO15118-3.pdf` 참조.
+- MME 타입·필드 상세: **HomePlug Green PHY Specification** 및 **QCA7000 Programmer's Guide** 참조.
 - 코드 내 구조체 정의: `slac/slac.h`, `mme/homeplug.h`, `mme/mme.h`.
 
 ---
