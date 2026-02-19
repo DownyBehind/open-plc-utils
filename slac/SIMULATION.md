@@ -171,20 +171,206 @@ ODA (6)          | OSA (6)          | MTYPE | MMV MMTYPE FMSN FMID | KEYTYPE MYN
 
 - **전체 패킷 = 60바이트** (19 + 41 payload).
 
-### 5.3 다른 SLAC 메시지의 전체 바이트 수 (헤더 19바이트 + payload)
+### 5.3 메시지별 전체 크기 및 payload 필드 (바이트별)
 
-| 메시지 | payload 크기(대략) | 전체(대략) |
-|--------|--------------------|------------|
-| CM_SLAC_PARAM.REQ | 1+1+8+1+2 = 13 | 32 |
-| CM_SLAC_PARAM.CNF | 6+1+1+1+6+1+1+8+2 = 27 | 46 |
-| CM_START_ATTEN_CHAR.IND | 2+1+1+1+6+8 = 19 | 38 |
-| CM_ATTEN_CHAR.IND | 2+6+8+17+17+1+(1+255) | 306+ |
-| CM_SLAC_MATCH.REQ | 2+2+17+6+17+6+8+8 = 66 | 85 |
-| CM_SLAC_MATCH.CNF | 2+2+17+6+17+6+8+8+7+1+16 = 90 | 109 |
-| CM_SET_KEY.REQ | 41 | **60** |
-| CM_SET_KEY.CNF | 1+4+4+1+2+1+1+27 = 41 | 60 |
+아래는 **공통 헤더 19바이트(오프셋 0~18)** 뒤, 각 메시지의 **payload(오프셋 19~)** 필드 레이아웃입니다. 오프셋은 **패킷 처음(0) 기준** 바이트 위치입니다.
 
-정확한 필드 정의는 `slac/slac.h`의 `cm_slac_param_request`, `cm_slac_match_request` 등 구조체를 보면 바이트 단위로 맞출 수 있습니다.
+---
+
+#### CM_SLAC_PARAM.REQ — 전체 32바이트
+
+| 오프셋 | 크기 | 필드 | 의미 |
+|--------|------|------|------|
+| 0~18 | 19 | (공통 헤더) | ODA, OSA, MTYPE 0x88E1, MMV, MMTYPE(0x6064), FMSN, FMID |
+| 19 | 1 | APPLICATION_TYPE | 0x00 등 |
+| 20 | 1 | SECURITY_TYPE | 0x00 |
+| 21 | 8 | RunID | SLAC_RUNID_LEN |
+| 29 | 1 | CipherSuiteSetSize | |
+| 30 | 2 | CipherSuite[0] | 리틀엔디언 |
+
+---
+
+#### CM_SLAC_PARAM.CNF — 전체 46바이트
+
+| 오프셋 | 크기 | 필드 | 의미 |
+|--------|------|------|------|
+| 0~18 | 19 | (공통 헤더) | MMTYPE = 0x6065 (CNF) |
+| 19 | 6 | MSOUND_TARGET | MAC 주소 |
+| 25 | 1 | NUM_SOUNDS | |
+| 26 | 1 | TIME_OUT | |
+| 27 | 1 | RESP_TYPE | |
+| 28 | 6 | FORWARDING_STA | MAC |
+| 34 | 1 | APPLICATION_TYPE | |
+| 35 | 1 | SECURITY_TYPE | |
+| 36 | 8 | RunID | |
+| 44 | 2 | CipherSuite | 리틀엔디언 |
+
+---
+
+#### CM_START_ATTEN_CHAR.IND — 전체 38바이트
+
+| 오프셋 | 크기 | 필드 | 의미 |
+|--------|------|------|------|
+| 0~18 | 19 | (공통 헤더) | MMTYPE = 0x606A (IND) |
+| 19 | 1 | APPLICATION_TYPE | |
+| 20 | 1 | SECURITY_TYPE | |
+| 21 | 1 | ACVarField.NUM_SOUNDS | |
+| 22 | 1 | ACVarField.TIME_OUT | |
+| 23 | 1 | ACVarField.RESP_TYPE | |
+| 24 | 6 | ACVarField.FORWARDING_STA | MAC |
+| 30 | 8 | ACVarField.RunID | |
+
+---
+
+#### CM_START_ATTEN_CHAR.RSP — 전체 19바이트
+
+| 오프셋 | 크기 | 필드 | 의미 |
+|--------|------|------|------|
+| 0~18 | 19 | (공통 헤더만) | MMTYPE = 0x606B (RSP), payload 없음 |
+
+---
+
+#### CM_MNBC_SOUND.IND — 전체 71바이트
+
+| 오프셋 | 크기 | 필드 | 의미 |
+|--------|------|------|------|
+| 0~18 | 19 | (공통 헤더) | MMTYPE = 0x6076 (IND) |
+| 19 | 1 | APPLICATION_TYPE | |
+| 20 | 1 | SECURITY_TYPE | |
+| 21 | 17 | MSVarField.SenderID | SLAC_UNIQUE_ID_LEN |
+| 38 | 1 | MSVarField.CNT | |
+| 39 | 8 | MSVarField.RunID | |
+| 47 | 8 | MSVarField.RSVD | 예약 |
+| 55 | 16 | MSVarField.RND | SLAC_RND_LEN |
+
+---
+
+#### CM_ATTEN_CHAR.IND — 전체 326바이트
+
+| 오프셋 | 크기 | 필드 | 의미 |
+|--------|------|------|------|
+| 0~18 | 19 | (공통 헤더) | MMTYPE = 0x606E (IND) |
+| 19 | 1 | APPLICATION_TYPE | |
+| 20 | 1 | SECURITY_TYPE | |
+| 21 | 6 | ACVarField.SOURCE_ADDRESS | MAC |
+| 27 | 8 | ACVarField.RunID | |
+| 35 | 17 | ACVarField.SOURCE_ID | |
+| 52 | 17 | ACVarField.RESP_ID | |
+| 69 | 1 | ACVarField.NUM_SOUNDS | |
+| 70 | 1 | ATTEN_PROFILE.NumGroups | |
+| 71 | 255 | ATTEN_PROFILE.AAG | 감쇠 그룹 데이터 |
+
+---
+
+#### CM_ATTEN_CHAR.RSP — 전체 70바이트
+
+| 오프셋 | 크기 | 필드 | 의미 |
+|--------|------|------|------|
+| 0~18 | 19 | (공통 헤더) | MMTYPE = 0x606F (RSP) |
+| 19 | 1 | APPLICATION_TYPE | |
+| 20 | 1 | SECURITY_TYPE | |
+| 21 | 6 | ACVarField.SOURCE_ADDRESS | MAC |
+| 27 | 8 | ACVarField.RunID | |
+| 35 | 17 | ACVarField.SOURCE_ID | |
+| 52 | 17 | ACVarField.RESP_ID | |
+| 69 | 1 | ACVarField.Result | |
+
+---
+
+#### CM_SLAC_MATCH.REQ — 전체 85바이트
+
+| 오프셋 | 크기 | 필드 | 의미 |
+|--------|------|------|------|
+| 0~18 | 19 | (공통 헤더) | MMTYPE = 0x607C (REQ) |
+| 19 | 1 | APPLICATION_TYPE | |
+| 20 | 1 | SECURITY_TYPE | |
+| 21 | 2 | MVFLength | 리틀엔디언 |
+| 23 | 17 | MatchVarField.PEV_ID | |
+| 40 | 6 | MatchVarField.PEV_MAC | MAC |
+| 46 | 17 | MatchVarField.EVSE_ID | |
+| 63 | 6 | MatchVarField.EVSE_MAC | MAC |
+| 69 | 8 | MatchVarField.RunID | |
+| 77 | 8 | MatchVarField.RSVD | 예약 |
+
+---
+
+#### CM_SLAC_MATCH.CNF — 전체 109바이트
+
+| 오프셋 | 크기 | 필드 | 의미 |
+|--------|------|------|------|
+| 0~18 | 19 | (공통 헤더) | MMTYPE = 0x607D (CNF) |
+| 19 | 1 | APPLICATION_TYPE | |
+| 20 | 1 | SECURITY_TYPE | |
+| 21 | 2 | MVFLength | 리틀엔디언 |
+| 23 | 17 | MatchVarField.PEV_ID | |
+| 40 | 6 | MatchVarField.PEV_MAC | MAC |
+| 46 | 17 | MatchVarField.EVSE_ID | |
+| 63 | 6 | MatchVarField.EVSE_MAC | MAC |
+| 69 | 8 | MatchVarField.RunID | |
+| 77 | 8 | MatchVarField.RSVD1 | 예약 |
+| 85 | 7 | MatchVarField.NID | SLAC_NID_LEN |
+| 92 | 1 | MatchVarField.RSVD2 | 예약 |
+| 93 | 16 | MatchVarField.NMK | SLAC_NMK_LEN |
+
+---
+
+#### CM_SET_KEY.REQ — 전체 60바이트
+
+위 **5.2** 표와 동일. (KEYTYPE, MYNOUNCE, YOURNOUNCE, PID, PRN, PMN, CCOCAP, NID, NEWEKS, NEWKEY, RSVD.)
+
+---
+
+#### CM_SET_KEY.CNF — 전체 60바이트
+
+| 오프셋 | 크기 | 필드 | 의미 |
+|--------|------|------|------|
+| 0~18 | 19 | (공통 헤더) | MMTYPE = 0x6009 (CNF) |
+| 19 | 1 | RESULT | 결과 코드 |
+| 20 | 4 | MYNOUNCE | |
+| 24 | 4 | YOURNOUNCE | |
+| 28 | 1 | PID | |
+| 29 | 2 | PRN | 리틀엔디언 |
+| 31 | 1 | PMN | |
+| 32 | 1 | CCOCAP | |
+| 33 | 27 | RSVD | 예약 |
+
+---
+
+#### CM_VALIDATE.REQ — 전체 22바이트
+
+| 오프셋 | 크기 | 필드 | 의미 |
+|--------|------|------|------|
+| 0~18 | 19 | (공통 헤더) | MMTYPE = 0x6078 (REQ) |
+| 19 | 1 | SignalType | |
+| 20 | 1 | VRVarField.Timer | |
+| 21 | 1 | VRVarField.Result | |
+
+---
+
+#### CM_VALIDATE.CNF — 전체 22바이트
+
+| 오프셋 | 크기 | 필드 | 의미 |
+|--------|------|------|------|
+| 0~18 | 19 | (공통 헤더) | MMTYPE = 0x6079 (CNF) |
+| 19 | 1 | SignalType | |
+| 20 | 1 | VCVarField.ToggleNum | |
+| 21 | 1 | VCVarField.Result | |
+
+---
+
+#### CM_ATTEN_PROFILE.IND — 전체 282바이트
+
+| 오프셋 | 크기 | 필드 | 의미 |
+|--------|------|------|------|
+| 0~18 | 19 | (공통 헤더) | MMTYPE = 0x6086 (IND) |
+| 19 | 6 | PEV_MAC | MAC |
+| 25 | 1 | NumGroups | |
+| 26 | 1 | RSVD | 예약 |
+| 27 | 255 | AAG | 감쇠 데이터 |
+
+---
+
+**요약:** 공통 헤더 19바이트(0~18)는 항상 동일하고, **오프셋 19부터가 메시지별 payload**이며 위 표대로 바이트/필드가 대응됩니다. 구조체 정의는 `slac/slac.h` 참고.
 
 ### 5.4 어떻게 보나
 
