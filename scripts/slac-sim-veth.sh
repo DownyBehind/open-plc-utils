@@ -5,10 +5,24 @@
 # EV(pev) and EVSE(evse) communicate over virtual Ethernet; you can
 # capture MAC-layer (HomePlug 0x88E1) traffic on the veth interfaces.
 #
-# Requirements: Linux, ip (iproute2), pev and evse in PATH.
+# Requirements: Linux, ip (iproute2). Uses slac/pev and slac/evse from this repo if not in PATH.
 # Run with sufficient privilege (e.g. sudo) for creating veth and raw sockets.
 
 set -e
+
+# Project root (parent of scripts/); pev/evse in slac/ if not in PATH
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SLAC_BIN="${SLAC_BIN:-$ROOT/slac}"
+PEV="${SLAC_PEV:-}"
+EVSE="${SLAC_EVSE:-}"
+for p in "$SLAC_BIN/pev" "$SLAC_BIN/evse"; do
+	[ -x "$p" ] || true
+done
+[ -x "$SLAC_BIN/pev" ] && PEV="$SLAC_BIN/pev"
+[ -x "$SLAC_BIN/evse" ] && EVSE="$SLAC_BIN/evse"
+command -v pev >/dev/null 2>&1 && [ -z "$PEV" ] && PEV=pev
+command -v evse >/dev/null 2>&1 && [ -z "$EVSE" ] && EVSE=evse
 
 VETH_PEV="${SLAC_VETH_PEV:-veth_pev}"
 VETH_EVSE="${SLAC_VETH_EVSE:-veth_evse}"
@@ -58,14 +72,16 @@ do_run () {
 		echo "Run '$0 start' first to create the veth pair."
 		exit 1
 	fi
+	[ -n "$EVSE" ] || { echo "evse not found. Build with: make -C slac"; exit 1; }
+	[ -n "$PEV" ] || { echo "pev not found. Build with: make -C slac"; exit 1; }
 	EVSE_PID=
 	trap '[ -n "$EVSE_PID" ] && kill $EVSE_PID 2>/dev/null; exit' INT TERM
 	echo "Starting evse on $VETH_EVSE (background)..."
-	evse -i "$VETH_EVSE" -v &
+	"$EVSE" -i "$VETH_EVSE" -v &
 	EVSE_PID=$!
 	sleep 2
 	echo "Starting pev on $VETH_PEV..."
-	pev -i "$VETH_PEV" -v
+	"$PEV" -i "$VETH_PEV" -v
 	kill $EVSE_PID 2>/dev/null || true
 }
 
@@ -79,17 +95,19 @@ do_run_capture () {
 	mkdir -p "$CAPDIR"
 	EVSE_PID=
 	TCPDUMP_PID=
+	[ -n "$EVSE" ] || { echo "evse not found. Build with: make -C slac"; exit 1; }
+	[ -n "$PEV" ] || { echo "pev not found. Build with: make -C slac"; exit 1; }
 	trap '[ -n "$TCPDUMP_PID" ] && kill $TCPDUMP_PID 2>/dev/null; [ -n "$EVSE_PID" ] && kill $EVSE_PID 2>/dev/null; exit' INT TERM
 	echo "Capturing HomePlug (0x88E1) traffic to $CAPFILE ..."
 	tcpdump -i "$VETH_PEV" -w "$CAPFILE" -U ether proto 0x88e1 2>/dev/null &
 	TCPDUMP_PID=$!
 	sleep 1
 	echo "Starting evse on $VETH_EVSE (background)..."
-	evse -i "$VETH_EVSE" -v &
+	"$EVSE" -i "$VETH_EVSE" -v &
 	EVSE_PID=$!
 	sleep 2
 	echo "Starting pev on $VETH_PEV..."
-	pev -i "$VETH_PEV" -v
+	"$PEV" -i "$VETH_PEV" -v
 	kill $EVSE_PID 2>/dev/null || true
 	kill $TCPDUMP_PID 2>/dev/null || true
 	echo "Capture saved: $CAPFILE (view with: tcpdump -r $CAPFILE -e -XX ether proto 0x88e1)"

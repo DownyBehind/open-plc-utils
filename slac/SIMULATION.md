@@ -6,7 +6,7 @@ PLC 보드(IC) 없이 Linux PC에서 EV(pev)와 EVSE(evse)가 주고받는 **SLA
 
 - Linux (veth 지원)
 - `ip` (iproute2), `tcpdump`
-- open-plc-utils 빌드 완료: `make` 후 `evse`, `pev`가 PATH에 있거나 `slac/`에서 실행
+- open-plc-utils 빌드: **프로젝트 루트에서** `make -C slac` 실행 후 `slac/evse`, `slac/pev` 생성됨 (설치 불필요)
 
 ## 1. veth 시뮬레이션 환경 준비
 
@@ -31,15 +31,19 @@ evse가 백그라운드로 뜨고, 이어서 pev가 실행되어 SLAC 파라미�
 
 ### 방법 B: 터미널 두 개로 분리 실행 (메시지 관측용)
 
+**프로젝트 루트**에서 실행 (evse/pev는 PATH에 없으면 `slac/` 안 바이너리 사용).
+
 **터미널 1 (EVSE):**
 ```bash
-sudo evse -i veth_evse -v
+sudo ./slac/evse -i veth_evse -v
 ```
 
 **터미널 2 (EV):**
 ```bash
-sudo pev -i veth_pev -v
+sudo ./slac/pev -i veth_pev -v
 ```
+
+또는 `cd slac` 한 뒤 `sudo ./evse -i veth_evse -v`, `sudo ./pev -i veth_pev -v`.
 
 이렇게 하면 터미널 3에서 아래처럼 MAC 레벨 트래픽을 볼 수 있습니다.
 
