@@ -99,10 +99,22 @@ Wireshark에서 열면 EtherType 0x88e1로 필터링해 EV–EVSE 간 SLAC 메�
 | CM_MNBC_SOUND       | IND(PEV→)        | 사운드 |
 | CM_ATTEN_CHAR       | IND(PEV→) / RSP(←EVSE) | 감쇠 프로파일 |
 | CM_SLAC_MATCH       | REQ(PEV→EVSE) / CNF(←EVSE) | PEV–EVSE 매칭 |
-| CM_SET_KEY          | REQ/CNF           | 키 설정 |
+| CM_SET_KEY          | REQ/CNF           | 키 설정 (호스트→**로컬 PLC 칩**) |
 
 프레임 구조: **Ethernet(14) + MMV(1) + MMTYPE(2) + payload**.  
 MMTYPE 정의는 `mme/homeplug.h` (CM_SLAC_PARAM 0x6064, CM_SLAC_MATCH 0x607C 등) 참고.
+
+### 4.1 veth 시뮬에서 "Can't set key"가 나오는 이유
+
+**SLAC 시퀀스(CM_SLAC_PARAM → … → CM_SLAC_MATCH)는 veth에서 정상 완료됩니다.**  
+그 다음 단계인 **CM_SET_KEY**는 실제 환경에서 **호스트가 자신 쪽 PLC 칩(QCA7000 등)에게** NMK/NID를 설정하라고 보내는 명령입니다. 즉, PEV는 PEV-PLC에게, EVSE는 EVSE-PLC에게 보내고, **응답(CNF)은 같은 기기(로컬 칩)에서 옵니다.**
+
+veth 시뮬에는 PLC 칩이 없고, 채널이 곧 상대편(pev↔evse)이라:
+
+- pev가 보낸 CM_SET_KEY.REQ → evse에게 전달됨 (evse는 CNF를 기대하므로 "REQ ?" 로 표시)
+- evse가 보낸 CM_SET_KEY.REQ → pev에게 전달됨 (pev는 CNF를 기대하므로 "CNF ?" 등으로 표시)
+
+그래서 **"Can't set key"는 veth만 쓰는 시뮬에서는 예상되는 결과**이며, SLAC 매칭과 MAC 레벨 메시지 관측 목적에는 문제 없습니다.
 
 ## 5. 정리
 
